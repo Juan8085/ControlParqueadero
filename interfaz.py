@@ -1,6 +1,10 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import operaciones # Importamos el "motor" que ya construimos
+import operaciones 
+import setup_db # <-- NUEVO
+
+# Aseguramos que la base de datos y las tablas existan al abrir el programa
+setup_db.inicializar_base_datos() # <-- NUEVO
 
 def procesar_ingreso():
     placa = entry_placa.get().strip().upper()

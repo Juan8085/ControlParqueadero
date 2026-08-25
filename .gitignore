@@ -1,1 +1,4 @@
 parqueadero.db
+dist/
+build/
+*.spec
