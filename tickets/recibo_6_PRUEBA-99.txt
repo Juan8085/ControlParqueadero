@@ -1,0 +1,26 @@
+
+================================
+      PARQUEADERO CATEDRAL      
+   NIT: 900.000.000-1           
+   Dirección: Calle Principal   
+   Tel: 314 2579681
+
+================================
+TICKET DE INGRESO               
+--------------------------------
+Nro Ticket : #6        
+Placa      : PRUEBA-99             
+Vehículo   : CARRO        
+F. Ingreso : 2026-08-25 14:25:30     
+--------------------------------
+* Conserve este ticket para su 
+  salida. En caso de pérdida se 
+  cobrará multa.                
+* Tiempo de gracia: 15 min.     
+================================
+      ¡GRACIAS POR SU VISITA!   
+================================
+
+
+
+

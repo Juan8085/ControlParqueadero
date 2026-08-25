@@ -51,16 +51,15 @@ import math
 import csv
 
 def generar_recibo_fisico(ticket_id, placa, tipo_vehiculo, hora_ingreso):
-    """Genera el formato de recibo para impresora térmica y guarda un respaldo en TXT."""
+    """Genera el recibo térmico con el código QR gráfico y texto."""
     
-    # Estructura del recibo térmico (Ancho estimado: 32-40 caracteres)
+    # 1. Definir el texto del recibo térmico
     recibo_texto = f"""
 ================================
-      PARQUEADERO CATEDRAL      
+      PARQUEADERO EL HUILA      
    NIT: 900.000.000-1           
    Dirección: Calle Principal   
-   Tel: 314 2579681
-
+   Tel: 310 000 0000            
 ================================
 TICKET DE INGRESO               
 --------------------------------
@@ -69,34 +68,50 @@ Placa      : {placa}
 Vehículo   : {tipo_vehiculo}        
 F. Ingreso : {hora_ingreso}     
 --------------------------------
-* Conserve este ticket para su 
-  salida. En caso de pérdida se 
-  cobrará multa.                
-* Tiempo de gracia: 15 min.     
-================================
-      ¡GRACIAS POR SU VISITA!   
-================================
-\n\n\n
+Escanee el código para salir:
 """
     
-    # Guardar una copia física en formato de texto dentro de la carpeta 'tickets'
-    # Esto sirve de respaldo por si la impresora térmica llega a fallar o quedarse sin papel.
+    # Ruta de la imagen QR que ya genera el sistema
+    ruta_qr = f"tickets/ticket_{ticket_id}_{placa}.png"
+    
+    # Respaldo en archivo de texto (Simulación física)
     archivo_recibo = f"tickets/recibo_{ticket_id}_{placa}.txt"
     with open(archivo_recibo, "w", encoding="utf-8") as f:
         f.write(recibo_texto)
+        f.write(f"[IMAGEN DE CÓDIGO QR: {ticket_id}-{placa}]\n")
+        f.write("--------------------------------\n")
+        f.write("* Conserve este ticket.\n")
+        f.write("* Tiempo de gracia: 15 min.\n")
+        f.write("================================\n")
+        f.write("      ¡GRACIAS POR SU VISITA!   \n")
+        f.write("================================\n\n\n\n")
         
-    print(f"📄 Recibo térmico generado en: {archivo_recibo}")
-    
-    # OPCIONAL TÉCNICO PARA LA IMPRESORA REAL:
-    # Si en el computador del parqueadero conectas la impresora USB, 
-    # puedes descomentar este bloque ajustando el Vendor ID y Product ID de tu impresora:
-    # try:
-    #     from escpos.printer import Usb
-    #     p = Usb(0x0416, 0x5011) # Reemplaza con los HEX ID de tu impresora térmica
-    #     p.text(recibo_texto)
-    #     p.cut()
-    # except Exception as e:
-    #     print(f"Impresora no detectada: {e}")
+    print(f"📄 Recibo térmico y QR lógico listos en la carpeta tickets.")
+
+    # ENVÍO REAL A LA IMPRESORA TÉRMICA POS (USB)
+    try:
+        from escpos.printer import Usb
+        # Nota: Aquí conectas tu tiquetera USB. Los valores Vendor ID (idVendor) y Product ID (idProduct) 
+        # se configuran según la marca de tu impresora (ej. Epson, Rongta, Bixolon, Genérica POS).
+        # Ejemplo por defecto genérico: 0x0416, 0x5011 (puedes ajustarlos al conectar la física).
+        p = Usb(0x0416, 0x5011, profile="POS-58") 
+        
+        # Imprimir encabezado de texto
+        p.text(recibo_texto)
+        
+        # Imprimir el código QR de manera gráfica para que la pistola lo lea directo del papel
+        p.qr(f"{ticket_id}-{placa}", size=6, center=True)
+        
+        # Imprimir pie de página y cortar el papel automáticamente
+        p.text("\n* Conserve este ticket para su salida.\n")
+        p.text("================================\n")
+        p.text("      ¡GRACIAS POR SU VISITA!   \n")
+        p.text("================================\n\n\n")
+        p.cut()
+        print("🖨️ ¡Comando enviado a la impresora térmica con éxito!")
+    except Exception as e:
+        # Si la impresora física no está conectada al PC de desarrollo, el programa no se detiene ni se cae
+        print(f"⚠️ Impresora física no conectada (Modo simulación activo): {e}")
 
     return archivo_recibo
 
