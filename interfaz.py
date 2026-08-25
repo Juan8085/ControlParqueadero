@@ -15,7 +15,7 @@ def procesar_ingreso():
         return
         
     try:
-        # PRIMERO: Verificar si el vehículo tiene una mensualidad activa
+        # Verificar mensualidad activa
         es_mensual, vencimiento = operaciones.verificar_mensualidad_activa(placa)
         
         if es_mensual:
@@ -23,16 +23,24 @@ def procesar_ingreso():
                 "Vehículo Autorizado (MENSUALIDAD)", 
                 f"El vehículo con placa {placa} tiene una MENSUALIDAD ACTIVA.\n\n"
                 f"Vence el: {vencimiento}\n\n"
-                "¡Puede ingresar sin generar ticket de cobro diario!"
+                "¡Puede ingresar sin generar ticket!"
             )
             entry_placa.delete(0, tk.END)
             return
 
-        # SEGUNDO: Si no es mensual, procede con el flujo normal de ticket por horas/días
+        # Registrar entrada normal
         id_generado, hora_in = operaciones.registrar_ingreso(placa, tipo)
         operaciones.generar_qr_ticket(id_generado, placa)
         
-        messagebox.showinfo("Ingreso Exitoso", f"Ticket #{id_generado} generado para {placa}.\nSe guardó el QR en la carpeta tickets.")
+        # Generar el recibo térmico en texto
+        operaciones.generar_recibo_fisico(id_generado, placa, tipo, hora_in)
+        
+        messagebox.showinfo(
+            "Ingreso Exitoso", 
+            f"Ticket #{id_generado} registrado para {placa}.\n\n"
+            "✅ Se generó el Código QR.\n"
+            "✅ Se generó el recibo térmico para impresión."
+        )
         entry_placa.delete(0, tk.END)
     except Exception as e:
         messagebox.showerror("Error del Sistema", f"Ocurrió un problema: {str(e)}")

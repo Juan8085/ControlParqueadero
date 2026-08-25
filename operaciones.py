@@ -50,6 +50,56 @@ def generar_qr_ticket(ticket_id, placa):
 import math
 import csv
 
+def generar_recibo_fisico(ticket_id, placa, tipo_vehiculo, hora_ingreso):
+    """Genera el formato de recibo para impresora térmica y guarda un respaldo en TXT."""
+    
+    # Estructura del recibo térmico (Ancho estimado: 32-40 caracteres)
+    recibo_texto = f"""
+================================
+      PARQUEADERO CATEDRAL      
+   NIT: 900.000.000-1           
+   Dirección: Calle Principal   
+   Tel: 314 2579681
+
+================================
+TICKET DE INGRESO               
+--------------------------------
+Nro Ticket : #{ticket_id}        
+Placa      : {placa}             
+Vehículo   : {tipo_vehiculo}        
+F. Ingreso : {hora_ingreso}     
+--------------------------------
+* Conserve este ticket para su 
+  salida. En caso de pérdida se 
+  cobrará multa.                
+* Tiempo de gracia: 15 min.     
+================================
+      ¡GRACIAS POR SU VISITA!   
+================================
+\n\n\n
+"""
+    
+    # Guardar una copia física en formato de texto dentro de la carpeta 'tickets'
+    # Esto sirve de respaldo por si la impresora térmica llega a fallar o quedarse sin papel.
+    archivo_recibo = f"tickets/recibo_{ticket_id}_{placa}.txt"
+    with open(archivo_recibo, "w", encoding="utf-8") as f:
+        f.write(recibo_texto)
+        
+    print(f"📄 Recibo térmico generado en: {archivo_recibo}")
+    
+    # OPCIONAL TÉCNICO PARA LA IMPRESORA REAL:
+    # Si en el computador del parqueadero conectas la impresora USB, 
+    # puedes descomentar este bloque ajustando el Vendor ID y Product ID de tu impresora:
+    # try:
+    #     from escpos.printer import Usb
+    #     p = Usb(0x0416, 0x5011) # Reemplaza con los HEX ID de tu impresora térmica
+    #     p.text(recibo_texto)
+    #     p.cut()
+    # except Exception as e:
+    #     print(f"Impresora no detectada: {e}")
+
+    return archivo_recibo
+
 def calcular_tarifa(tipo_vehiculo, tiempo_transcurrido):
     """Calcula el cobro basado en la imagen image_be7527.jpg"""
     # Convertir el tiempo a minutos para mayor precisión
