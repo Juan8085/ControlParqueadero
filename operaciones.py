@@ -48,6 +48,7 @@ def generar_qr_ticket(ticket_id, placa):
     print(f"✅ Ingreso exitoso: Ticket #{ticket_id} para placa {placa}.")
     print(f"📁 QR guardado en: {nombre_archivo}")
 import math
+import csv
 
 def calcular_tarifa(tipo_vehiculo, tiempo_transcurrido):
     """Calcula el cobro basado en la imagen image_be7527.jpg"""
@@ -156,7 +157,55 @@ def registrar_salida(datos_qr):
         "tiempo": f"{horas_totales} horas",
         "total": f"${total_a_pagar:,.0f}"
     }
+def obtener_estadisticas():
+    """Consulta la base de datos para obtener las ventas de hoy y el histórico mensual."""
+    conexion = sqlite3.connect("parqueadero.db")
+    cursor = conexion.cursor()
+    
+    hoy = datetime.datetime.now().strftime("%Y-%m-%d")
+    
+    # 1. Calcular Ventas del Día Actual
+    cursor.execute('''
+        SELECT tipo_vehiculo, SUM(total_pagado), COUNT(id) 
+        FROM registros 
+        WHERE estado = 'PAGADO' AND date(hora_salida) = ? 
+        GROUP BY tipo_vehiculo
+    ''', (hoy,))
+    ventas_hoy = cursor.fetchall()
+    
+    # 2. Calcular Ventas Agrupadas por Mes (Para el comparativo)
+    cursor.execute('''
+        SELECT strftime('%Y-%m', hora_salida) as mes, SUM(total_pagado), COUNT(id)
+        FROM registros 
+        WHERE estado = 'PAGADO' 
+        GROUP BY mes 
+        ORDER BY mes DESC
+    ''')
+    ventas_mes = cursor.fetchall()
+    conexion.close()
+    
+    return ventas_hoy, ventas_mes
 
+def exportar_excel_csv():
+    """Exporta todos los registros pagados a un archivo apto para Excel."""
+    conexion = sqlite3.connect("parqueadero.db")
+    cursor = conexion.cursor()
+    cursor.execute('''
+        SELECT id, placa, tipo_vehiculo, hora_ingreso, hora_salida, total_pagado 
+        FROM registros WHERE estado = 'PAGADO'
+    ''')
+    datos = cursor.fetchall()
+    conexion.close()
+    
+    # Generar un nombre de archivo único con la fecha y hora
+    nombre_archivo = f"Reporte_Parqueadero_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    
+    with open(nombre_archivo, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f, delimiter=';') # El punto y coma facilita abrirlo en Excel en español
+        writer.writerow(['ID_Ticket', 'Placa', 'Tipo', 'Fecha Ingreso', 'Fecha Salida', 'Total Cobrado'])
+        writer.writerows(datos)
+        
+    return nombre_archivo
 # --- ZONA DE PRUEBA ---
 if __name__ == "__main__":
     print("--- 1. SIMULANDO INGRESO ---")
