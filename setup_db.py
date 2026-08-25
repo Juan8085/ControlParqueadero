@@ -34,7 +34,19 @@ def inicializar_base_datos():
     )
     ''')
 
-    # 3. Insertar las tarifas iniciales basadas en tu imagen (Solo si la tabla está vacía)
+# 3. Crear tabla de Mensualidades (Clientes fijos)
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS mensualidades (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        placa TEXT UNIQUE NOT NULL,
+        tipo_vehiculo TEXT NOT NULL,
+        fecha_pago DATE NOT NULL,
+        fecha_vencimiento DATE NOT NULL,
+        total_pagado REAL NOT NULL
+    )
+    ''')
+
+    # 4. Insertar las tarifas iniciales basadas en tu imagen (Solo si la tabla está vacía)
     cursor.execute("SELECT COUNT(*) FROM tarifas")
     if cursor.fetchone()[0] == 0:
         tarifas_iniciales = [

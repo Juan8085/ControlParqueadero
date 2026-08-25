@@ -157,6 +157,62 @@ def registrar_salida(datos_qr):
         "tiempo": f"{horas_totales} horas",
         "total": f"${total_a_pagar:,.0f}"
     }
+
+from dateutil.relativedelta import relativedelta # Necesario para sumar un mes exacto
+
+def registrar_mensualidad(placa, tipo_vehiculo):
+    """Registra el pago de un mes para una placa y actualiza las estadísticas."""
+    conexion = sqlite3.connect("parqueadero.db")
+    cursor = conexion.cursor()
+    
+    # Determinar el valor de la mensualidad según tu tabla de tarifas
+    valor_mensualidad = 125000 if tipo_vehiculo == 'CARRO' else 50000
+    
+    fecha_pago = datetime.datetime.now()
+    fecha_vencimiento = fecha_pago + relativedelta(months=1)
+    
+    try:
+        # Usamos REPLACE por si el cliente ya existía y está renovando
+        cursor.execute('''
+        INSERT OR REPLACE INTO mensualidades (placa, tipo_vehiculo, fecha_pago, fecha_vencimiento, total_pagado)
+        VALUES (?, ?, ?, ?, ?)
+        ''', (placa, tipo_vehiculo, fecha_pago.strftime("%Y-%m-%d"), fecha_vencimiento.strftime("%Y-%m-%d"), valor_mensualidad))
+        
+        # Opcional: Registrar este pago en la tabla de transacciones generales para que sume en el Excel y cuadre la caja del día
+        cursor.execute('''
+        INSERT INTO registros (placa, tipo_vehiculo, hora_ingreso, hora_salida, estado, total_pagado)
+        VALUES (?, ?, ?, ?, 'PAGADO', ?)
+        ''', (placa, f"{tipo_vehiculo} (MES)", fecha_pago.strftime("%Y-%m-%d %H:%M:%S"), fecha_pago.strftime("%Y-%m-%d %H:%M:%S"), valor_mensualidad))
+        
+        conexion.commit()
+        resultado = True
+    except Exception as e:
+        print(f"Error al registrar mensualidad: {e}")
+        resultado = False
+    finally:
+        conexion.close()
+        
+    return resultado, fecha_vencimiento.strftime("%Y-%m-%d")
+
+def verificar_mensualidad_activa(placa):
+    """Verifica si una placa tiene un mes pagado y vigente."""
+    conexion = sqlite3.connect("parqueadero.db")
+    cursor = conexion.cursor()
+    
+    hoy = datetime.datetime.now().strftime("%Y-%m-%d")
+    
+    cursor.execute('''
+        SELECT fecha_vencimiento FROM mensualidades 
+        WHERE placa = ? AND fecha_vencimiento >= ?
+    ''', (placa, hoy))
+    
+    registro = cursor.fetchone()
+    conexion.close()
+    
+    if registro:
+        return True, registro[0] # Retorna True y la fecha de vencimiento
+    return False, None
+
 def obtener_estadisticas():
     """Consulta la base de datos para obtener las ventas de hoy y el histórico mensual."""
     conexion = sqlite3.connect("parqueadero.db")

@@ -15,12 +15,25 @@ def procesar_ingreso():
         return
         
     try:
-        # Llamamos a nuestro motor de operaciones
+        # PRIMERO: Verificar si el vehículo tiene una mensualidad activa
+        es_mensual, vencimiento = operaciones.verificar_mensualidad_activa(placa)
+        
+        if es_mensual:
+            messagebox.showinfo(
+                "Vehículo Autorizado (MENSUALIDAD)", 
+                f"El vehículo con placa {placa} tiene una MENSUALIDAD ACTIVA.\n\n"
+                f"Vence el: {vencimiento}\n\n"
+                "¡Puede ingresar sin generar ticket de cobro diario!"
+            )
+            entry_placa.delete(0, tk.END)
+            return
+
+        # SEGUNDO: Si no es mensual, procede con el flujo normal de ticket por horas/días
         id_generado, hora_in = operaciones.registrar_ingreso(placa, tipo)
         operaciones.generar_qr_ticket(id_generado, placa)
         
         messagebox.showinfo("Ingreso Exitoso", f"Ticket #{id_generado} generado para {placa}.\nSe guardó el QR en la carpeta tickets.")
-        entry_placa.delete(0, tk.END) # Limpiar la caja de texto
+        entry_placa.delete(0, tk.END)
     except Exception as e:
         messagebox.showerror("Error del Sistema", f"Ocurrió un problema: {str(e)}")
 
@@ -47,6 +60,42 @@ def procesar_salida(event=None):
         lbl_res_total.config(text=f"TOTAL: {resultado['total']}", fg="green")
     
     entry_qr.delete(0, tk.END) # Limpiar para la siguiente lectura
+
+def abrir_ventana_mensualidad():
+    """Ventana para registrar o renovar una mensualidad."""
+    ven_men = tk.Toplevel(ventana)
+    ven_men.title("Gestión de Mensualidades")
+    ven_men.geometry("400x300")
+    ven_men.config(padx=20, pady=20)
+    
+    tk.Label(ven_men, text="REGISTRAR MENSUALIDAD", font=("Arial", 12, "bold")).pack(pady=10)
+    
+    tk.Label(ven_men, text="Placa del Vehículo:", font=("Arial", 10)).pack(anchor="w")
+    e_placa = tk.Entry(ven_men, font=("Arial", 12), width=20)
+    e_placa.pack(pady=5, fill="x")
+    
+    tk.Label(ven_men, text="Tipo de Vehículo:", font=("Arial", 10)).pack(anchor="w", pady=(5,0))
+    c_tipo = ttk.Combobox(ven_men, values=["CARRO", "MOTO"], state="readonly", font=("Arial", 10), width=18)
+    c_tipo.current(0)
+    c_tipo.pack(pady=5, fill="x")
+    
+    def guardar_mensualidad():
+        placa = e_placa.get().strip().upper()
+        tipo = c_tipo.get()
+        if not placa:
+            messagebox.showerror("Error", "Debe digitar una placa.")
+            return
+            
+        exito, vencimiento = operaciones.registrar_mensualidad(placa, tipo)
+        if exito:
+            valor = "$125,000" if tipo == "CARRO" else "$50,000"
+            messagebox.showinfo("Éxito", f"Mensualidad registrada para {placa}.\nTotal cobrado: {valor}\nVálido hasta: {vencimiento}")
+            ven_men.destroy()
+        else:
+            messagebox.showerror("Error", "No se pudo registrar la mensualidad.")
+
+    tk.Button(ven_men, text="GUARDAR Y COBRAR MENSUALIDAD", bg="#2b6cb0", fg="white", font=("Arial", 10, "bold"), command=guardar_mensualidad).pack(pady=20, fill="x")
+
 def abrir_panel_propietario():
     """Abre una nueva ventana con las estadísticas del parqueadero."""
     panel = tk.Toplevel(ventana)
@@ -150,10 +199,13 @@ lbl_res_tiempo.pack()
 lbl_res_total = tk.Label(frame_resultados, text="TOTAL: $0", font=("Arial", 18, "bold"))
 lbl_res_total.pack(pady=5)
 
-# Botón para el Propietario (Agregarlo encima de ventana.mainloop())
-tk.Label(ventana, text="--------------------------------------------------").pack(pady=10)
+
+# Botones administrativos al fondo de la ventana principal
+btn_mensualidad = tk.Button(ventana, text="💳 Registrar / Renovar Mensualidad", bg="#2b6cb0", fg="white", font=("Arial", 10, "bold"), command=abrir_ventana_mensualidad)
+btn_mensualidad.pack(pady=5, fill="x")
+
 btn_admin = tk.Button(ventana, text="📊 Ver Panel del Propietario", bg="#333333", fg="white", font=("Arial", 10, "bold"), command=abrir_panel_propietario)
-btn_admin.pack(pady=5) # <--- Esta línea es la que lo hace visible
+btn_admin.pack(pady=5, fill="x")
 
 # Iniciar la aplicación
 ventana.mainloop()
