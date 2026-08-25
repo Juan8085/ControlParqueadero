@@ -51,11 +51,10 @@ import math
 import csv
 
 def generar_recibo_fisico(ticket_id, placa, tipo_vehiculo, hora_ingreso):
-    """Genera el recibo térmico con el código QR gráfico y texto."""
+    """Genera el respaldo en texto y envía el recibo con QR a la impresora por Windows."""
     
     # 1. Definir el texto del recibo térmico
-    recibo_texto = f"""
-================================
+    recibo_texto = f"""================================
       PARQUEADERO EL HUILA      
    NIT: 900.000.000-1           
    Dirección: Calle Principal   
@@ -68,50 +67,49 @@ Placa      : {placa}
 Vehículo   : {tipo_vehiculo}        
 F. Ingreso : {hora_ingreso}     
 --------------------------------
-Escanee el código para salir:
+* Conserve este ticket para su 
+  salida. En caso de pérdida se 
+  cobrará multa.                
+* Tiempo de gracia: 15 min.     
+================================
+      ¡GRACIAS POR SU VISITA!   
+================================
+\n\n\n
 """
     
-    # Ruta de la imagen QR que ya genera el sistema
+    # Ruta de la imagen QR generada
     ruta_qr = f"tickets/ticket_{ticket_id}_{placa}.png"
     
-    # Respaldo en archivo de texto (Simulación física)
+    # 2. Respaldo en archivo de texto físico
     archivo_recibo = f"tickets/recibo_{ticket_id}_{placa}.txt"
     with open(archivo_recibo, "w", encoding="utf-8") as f:
         f.write(recibo_texto)
-        f.write(f"[IMAGEN DE CÓDIGO QR: {ticket_id}-{placa}]\n")
-        f.write("--------------------------------\n")
-        f.write("* Conserve este ticket.\n")
-        f.write("* Tiempo de gracia: 15 min.\n")
-        f.write("================================\n")
-        f.write("      ¡GRACIAS POR SU VISITA!   \n")
-        f.write("================================\n\n\n\n")
+        f.write(f"[QR ASOCIADO: {ruta_qr}]\n\n\n")
         
     print(f"📄 Recibo térmico y QR lógico listos en la carpeta tickets.")
 
-    # ENVÍO REAL A LA IMPRESORA TÉRMICA POS (USB)
+    # 3. ENVÍO A LA IMPRESORA TÉRMICA USANDO EL DRIVER DE WINDOWS
     try:
-        from escpos.printer import Usb
-        # Nota: Aquí conectas tu tiquetera USB. Los valores Vendor ID (idVendor) y Product ID (idProduct) 
-        # se configuran según la marca de tu impresora (ej. Epson, Rongta, Bixolon, Genérica POS).
-        # Ejemplo por defecto genérico: 0x0416, 0x5011 (puedes ajustarlos al conectar la física).
-        p = Usb(0x0416, 0x5011, profile="POS-58") 
+        from escpos.printer import Win32Raw
+        # 'POS-58' o el nombre exacto con el que Windows instaló tu impresora térmica
+        # (Ej: "POS-58 Printer", "Thermal Printer", etc.)
+        p = Win32Raw(printer_name="POS-58") 
         
-        # Imprimir encabezado de texto
+        # Imprimir texto
         p.text(recibo_texto)
         
-        # Imprimir el código QR de manera gráfica para que la pistola lo lea directo del papel
-        p.qr(f"{ticket_id}-{placa}", size=6, center=True)
-        
-        # Imprimir pie de página y cortar el papel automáticamente
-        p.text("\n* Conserve este ticket para su salida.\n")
-        p.text("================================\n")
-        p.text("      ¡GRACIAS POR SU VISITA!   \n")
-        p.text("================================\n\n\n")
+        # Imprimir la imagen del código QR directamente en el papel térmico
+        try:
+            p.image(ruta_qr)
+        except Exception as img_err:
+            print(f"No se pudo adjuntar la imagen del QR a la tiquetera: {img_err}")
+            
+        p.text("\n\n")
         p.cut()
-        print("🖨️ ¡Comando enviado a la impresora térmica con éxito!")
+        print("🖨️ ¡Impresión enviada correctamente a la tiquetera de Windows!")
     except Exception as e:
-        # Si la impresora física no está conectada al PC de desarrollo, el programa no se detiene ni se cae
-        print(f"⚠️ Impresora física no conectada (Modo simulación activo): {e}")
+        # Modo simulación silencioso si no hay una impresora térmica instalada en el PC de pruebas
+        print(f"⚠️ Impresora de Windows no detectada (Modo simulación activo): {e}")
 
     return archivo_recibo
 
