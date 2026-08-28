@@ -50,15 +50,22 @@ def generar_qr_ticket(ticket_id, placa):
 import math
 import csv
 
+import os
+import subprocess
+
 def generar_recibo_fisico(ticket_id, placa, tipo_vehiculo, hora_ingreso):
-    """Genera el respaldo en texto y envía el recibo con QR a la impresora por Windows."""
+    """Genera un recibo visual que incluye el texto y el QR, y lanza la impresión en Windows."""
     
-    # 1. Definir el texto del recibo térmico
+    # 1. Datos actualizados del parqueadero
+    nombre_parqueadero = "PARQUEADERO LA CATEDRAL"
+    direccion = "Calle 6 # 7-31"
+    telefono = "3142579681"
+    
+    # 2. Texto del recibo
     recibo_texto = f"""================================
-      PARQUEADERO EL HUILA      
-   NIT: 900.000.000-1           
-   Dirección: Calle Principal   
-   Tel: 310 000 0000            
+      {nombre_parqueadero}      
+   Dirección: {direccion}   
+   Tel: {telefono}            
 ================================
 TICKET DE INGRESO               
 --------------------------------
@@ -74,44 +81,61 @@ F. Ingreso : {hora_ingreso}
 ================================
       ¡GRACIAS POR SU VISITA!   
 ================================
-\n\n\n
 """
-    
-    # Ruta de la imagen QR generada
+
+    # Ruta de la imagen QR generada previamente
     ruta_qr = f"tickets/ticket_{ticket_id}_{placa}.png"
     
-    # 2. Respaldo en archivo de texto físico
-    archivo_recibo = f"tickets/recibo_{ticket_id}_{placa}.txt"
-    with open(archivo_recibo, "w", encoding="utf-8") as f:
-        f.write(recibo_texto)
-        f.write(f"[QR ASOCIADO: {ruta_qr}]\n\n\n")
-        
-    print(f"📄 Recibo térmico y QR lógico listos en la carpeta tickets.")
-
-    # 3. ENVÍO A LA IMPRESORA TÉRMICA USANDO EL DRIVER DE WINDOWS
+    # 3. CREAR UN RECIBO GRÁFICO UNIFICADO (TEXTO + QR)
     try:
-        from escpos.printer import Win32Raw
-        # 'POS-58' o el nombre exacto con el que Windows instaló tu impresora térmica
-        # (Ej: "POS-58 Printer", "Thermal Printer", etc.)
-        p = Win32Raw(printer_name="POS-58") 
+        from PIL import Image, ImageDraw, ImageFont
         
-        # Imprimir texto
-        p.text(recibo_texto)
+        # Abrir la imagen del QR
+        img_qr = Image.open(ruta_qr).resize((180, 180)) # Ajustar tamaño para recibo térmico (ancho 58mm aprox)
         
-        # Imprimir la imagen del código QR directamente en el papel térmico
+        # Crear una imagen en blanco para el recibo (Ancho: 380 px, Alto dinámico)
+        ancho_recibo = 380
+        alto_recibo = 480
+        img_recibo = Image.new("RGB", (ancho_recibo, alto_recibo), "white")
+        draw = ImageDraw.Draw(img_recibo)
+        
+        # Usar fuente predeterminada de sistema para evitar errores de rutas de fuentes
         try:
-            p.image(ruta_qr)
-        except Exception as img_err:
-            print(f"No se pudo adjuntar la imagen del QR a la tiquetera: {img_err}")
-            
-        p.text("\n\n")
-        p.cut()
-        print("🖨️ ¡Impresión enviada correctamente a la tiquetera de Windows!")
-    except Exception as e:
-        # Modo simulación silencioso si no hay una impresora térmica instalada en el PC de pruebas
-        print(f"⚠️ Impresora de Windows no detectada (Modo simulación activo): {e}")
+            fuente = ImageFont.load_default()
+        except Exception:
+            fuente = None
 
-    return archivo_recibo
+        # Dibujar el texto centrado/alineado en la imagen blanca
+        # Dividir el texto línea por línea
+        y_offset = 10
+        for linea in recibo_texto.split("\n"):
+            draw.text((15, y_offset), linea, fill="black", font=fuente)
+            y_offset += 15
+            
+        # Pegar el código QR debajo del texto
+        # Centrar el QR horizontalmente (380 - 180) / 2 = 100
+        img_recibo.paste(img_qr, (100, y_offset + 5))
+        
+        # Guardar la imagen final unificada del recibo
+        ruta_recibo_imagen = f"tickets/recibo_impresion_{ticket_id}_{placa}.png"
+        img_recibo.save(ruta_recibo_imagen)
+        
+        print(f"🖼️ Recibo gráfico unificado creado: {ruta_recibo_imagen}")
+        
+        # 4. LANZAR EL DIÁLOGO DE IMPRESIÓN DE WINDOWS AUTOMÁTICAMENTE
+        # Esto abre la imagen con el visor predeterminado de Windows y el comando de impresión (/p) 
+        # para que el usuario elija la impresora o imprima de inmediato sin importar la marca.
+        os.startfile(ruta_recibo_imagen, "print")
+
+    except Exception as e:
+        print(f"⚠️ Error generando el recibo gráfico o lanzando impresión: {e}")
+        # Respaldo en texto plano por si ocurre algún fallo gráfico
+        archivo_respaldo = f"tickets/recibo_{ticket_id}_{placa}.txt"
+        with open(archivo_respaldo, "w", encoding="utf-8") as f:
+            f.write(recibo_texto)
+            f.write(f"QR Asociado: {ruta_qr}\n")
+
+    return f"tickets/recibo_impresion_{ticket_id}_{placa}.png"
 
 def calcular_tarifa(tipo_vehiculo, tiempo_transcurrido):
     """Calcula el cobro basado en la imagen image_be7527.jpg"""
