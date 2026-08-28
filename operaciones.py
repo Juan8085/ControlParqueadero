@@ -51,91 +51,90 @@ import math
 import csv
 
 import os
-import subprocess
 
 def generar_recibo_fisico(ticket_id, placa, tipo_vehiculo, hora_ingreso):
-    """Genera un recibo visual que incluye el texto y el QR, y lanza la impresión en Windows."""
+    """Genera un recibo vertical con texto y QR alineados al centro para tiquetera térmica."""
     
     # 1. Datos actualizados del parqueadero
     nombre_parqueadero = "PARQUEADERO LA CATEDRAL"
     direccion = "Calle 6 # 7-31"
     telefono = "3142579681"
     
-    # 2. Texto del recibo
-    recibo_texto = f"""================================
-      {nombre_parqueadero}      
-   Dirección: {direccion}   
-   Tel: {telefono}            
-================================
-TICKET DE INGRESO               
---------------------------------
-Nro Ticket : #{ticket_id}        
-Placa      : {placa}             
-Vehículo   : {tipo_vehiculo}        
-F. Ingreso : {hora_ingreso}     
---------------------------------
-* Conserve este ticket para su 
-  salida. En caso de pérdida se 
-  cobrará multa.                
-* Tiempo de gracia: 15 min.     
-================================
-      ¡GRACIAS POR SU VISITA!   
-================================
-"""
+    # Asegurar que la carpeta 'tickets' exista
+    if not os.path.exists("tickets"):
+        os.makedirs("tickets")
 
-    # Ruta de la imagen QR generada previamente
     ruta_qr = f"tickets/ticket_{ticket_id}_{placa}.png"
+    ruta_recibo_imagen = f"tickets/recibo_impresion_{ticket_id}_{placa}.png"
     
-    # 3. CREAR UN RECIBO GRÁFICO UNIFICADO (TEXTO + QR)
     try:
         from PIL import Image, ImageDraw, ImageFont
         
-        # Abrir la imagen del QR
-        img_qr = Image.open(ruta_qr).resize((180, 180)) # Ajustar tamaño para recibo térmico (ancho 58mm aprox)
+        # Verificar si el archivo QR existe, si no, crearlo
+        if not os.path.exists(ruta_qr):
+            generar_qr_ticket(ticket_id, placa)
+            
+        img_qr = Image.open(ruta_qr).resize((150, 150)) # QR compacto para recibo
         
-        # Crear una imagen en blanco para el recibo (Ancho: 380 px, Alto dinámico)
-        ancho_recibo = 380
-        alto_recibo = 480
+        # 2. CONFIGURACIÓN VERTICAL (Formato Tira Térmica)
+        # Ancho: 320 píxeles, Alto: 480 píxeles (Vertical total)
+        ancho_recibo = 320
+        alto_recibo = 520
         img_recibo = Image.new("RGB", (ancho_recibo, alto_recibo), "white")
         draw = ImageDraw.Draw(img_recibo)
         
-        # Usar fuente predeterminada de sistema para evitar errores de rutas de fuentes
         try:
             fuente = ImageFont.load_default()
         except Exception:
             fuente = None
 
-        # Dibujar el texto centrado/alineado en la imagen blanca
-        # Dividir el texto línea por línea
+        # Líneas de texto organizadas para formato vertical
+        lineas = [
+            "================================",
+            f"   {nombre_parqueadero}   ",
+            f"   Dir: {direccion}   ",
+            f"   Tel: {telefono}   ",
+            "================================",
+            "TICKET DE INGRESO",
+            "--------------------------------",
+            f"Nro Ticket : #{ticket_id}",
+            f"Placa      : {placa}",
+            f"Vehículo   : {tipo_vehiculo}",
+            f"Ingreso    : {hora_ingreso}",
+            "--------------------------------",
+            "* Conserve este ticket para su",
+            "  salida. En caso de pérdida",
+            "  se cobrará multa.",
+            "* Tiempo de gracia: 15 min.",
+            "================================",
+            "     ¡GRACIAS POR SU VISITA!    ",
+            "================================"
+        ]
+
+        # Escribir el texto alineado con buen margen izquierdo (ej. 15 píxeles)
         y_offset = 10
-        for linea in recibo_texto.split("\n"):
+        for linea in lineas:
             draw.text((15, y_offset), linea, fill="black", font=fuente)
-            y_offset += 15
+            y_offset += 16
             
-        # Pegar el código QR debajo del texto
-        # Centrar el QR horizontalmente (380 - 180) / 2 = 100
-        img_recibo.paste(img_qr, (100, y_offset + 5))
+        # 3. CENTRAR EL CÓDIGO QR EXACTAMENTE EN LA MITAD HORIZONTAL
+        # (Ancho del recibo 320 - Ancho del QR 150) / 2 = 85 píxeles de margen izquierdo
+        x_centrado = (ancho_recibo - 150) // 2
+        img_recibo.paste(img_qr, (x_centrado, y_offset + 5))
         
-        # Guardar la imagen final unificada del recibo
-        ruta_recibo_imagen = f"tickets/recibo_impresion_{ticket_id}_{placa}.png"
-        img_recibo.save(ruta_recibo_imagen)
+        # Guardar la imagen final vertical y centrada
+        ruta_absoluta = os.path.abspath(ruta_recibo_imagen)
+        img_recibo.save(ruta_absoluta)
         
-        print(f"🖼️ Recibo gráfico unificado creado: {ruta_recibo_imagen}")
+        print(f"🖼️ Recibo vertical unificado creado: {ruta_absoluta}")
         
-        # 4. LANZAR EL DIÁLOGO DE IMPRESIÓN DE WINDOWS AUTOMÁTICAMENTE
-        # Esto abre la imagen con el visor predeterminado de Windows y el comando de impresión (/p) 
-        # para que el usuario elija la impresora o imprima de inmediato sin importar la marca.
-        os.startfile(ruta_recibo_imagen, "print")
+        # Lanzar diálogo de impresión de Windows
+        os.startfile(ruta_absoluta, "print")
 
     except Exception as e:
         print(f"⚠️ Error generando el recibo gráfico o lanzando impresión: {e}")
-        # Respaldo en texto plano por si ocurre algún fallo gráfico
-        archivo_respaldo = f"tickets/recibo_{ticket_id}_{placa}.txt"
-        with open(archivo_respaldo, "w", encoding="utf-8") as f:
-            f.write(recibo_texto)
-            f.write(f"QR Asociado: {ruta_qr}\n")
 
-    return f"tickets/recibo_impresion_{ticket_id}_{placa}.png"
+    return ruta_recibo_imagen
 
 def calcular_tarifa(tipo_vehiculo, tiempo_transcurrido):
     """Calcula el cobro basado en la imagen image_be7527.jpg"""

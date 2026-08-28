@@ -171,21 +171,70 @@ ventana.config(padx=20, pady=20)
 # Título General
 tk.Label(ventana, text="SISTEMA DE PARQUEADERO", font=("Arial", 16, "bold")).pack(pady=10)
 
-# --- PANEL DE INGRESO ---
+# --- PANEL DE INGRESO MODIFICADO (Campos independientes para Carro y Moto) ---
 frame_ingreso = tk.LabelFrame(ventana, text="1. Registrar Ingreso (Generar Ticket)", font=("Arial", 11, "bold"), padx=10, pady=10)
 frame_ingreso.pack(fill="x", pady=10)
 
-tk.Label(frame_ingreso, text="Placa del Vehículo:", font=("Arial", 10)).grid(row=0, column=0, pady=5, sticky="e")
-entry_placa = tk.Entry(frame_ingreso, font=("Arial", 12), width=15)
-entry_placa.grid(row=0, column=1, padx=10, pady=5)
+# Opción Carro
+tk.Label(frame_ingreso, text="Placa Carro:", font=("Arial", 10, "bold"), fg="#1a365d").grid(row=0, column=0, pady=5, sticky="e")
+entry_placa_carro = tk.Entry(frame_ingreso, font=("Arial", 12), width=12)
+entry_placa_carro.grid(row=0, column=1, padx=5, pady=5)
 
-tk.Label(frame_ingreso, text="Tipo:", font=("Arial", 10)).grid(row=1, column=0, pady=5, sticky="e")
-combo_tipo = ttk.Combobox(frame_ingreso, values=["CARRO", "MOTO"], state="readonly", font=("Arial", 10), width=13)
-combo_tipo.current(0) # Seleccionar CARRO por defecto
-combo_tipo.grid(row=1, column=1, padx=10, pady=5)
+def registrar_carro():
+    placa = entry_placa_carro.get().strip().upper()
+    if not placa:
+        messagebox.showerror("Error", "Por favor, digite la placa del carro.")
+        return
+    ejecutar_ingreso_general(placa, "CARRO")
+    entry_placa_carro.delete(0, tk.END)
 
-btn_ingresar = tk.Button(frame_ingreso, text="REGISTRAR ENTRADA", bg="#0052cc", fg="white", font=("Arial", 10, "bold"), command=procesar_ingreso)
-btn_ingresar.grid(row=2, columnspan=2, pady=15)
+btn_ingresar_carro = tk.Button(frame_ingreso, text="Entrada Carro", bg="#0052cc", fg="white", font=("Arial", 9, "bold"), command=registrar_carro)
+btn_ingresar_carro.grid(row=0, column=2, padx=5, pady=5)
+
+# Opción Moto
+tk.Label(frame_ingreso, text="Placa Moto:", font=("Arial", 10, "bold"), fg="#1a365d").grid(row=1, column=0, pady=5, sticky="e")
+entry_placa_moto = tk.Entry(frame_ingreso, font=("Arial", 12), width=12)
+entry_placa_moto.grid(row=1, column=1, padx=5, pady=5)
+
+def registrar_moto():
+    placa = entry_placa_moto.get().strip().upper()
+    if not placa:
+        messagebox.showerror("Error", "Por favor, digite la placa de la moto.")
+        return
+    ejecutar_ingreso_general(placa, "MOTO")
+    entry_placa_moto.delete(0, tk.END)
+
+btn_ingresar_moto = tk.Button(frame_ingreso, text="Entrada Moto", bg="#2b6cb0", fg="white", font=("Arial", 9, "bold"), command=registrar_moto)
+btn_ingresar_moto.grid(row=1, column=2, padx=5, pady=5)
+
+# Función interna unificada para procesar el ingreso y el recibo térmico
+def ejecutar_ingreso_general(placa, tipo):
+    try:
+        # Verificar mensualidad activa
+        es_mensual, vencimiento = operaciones.verificar_mensualidad_activa(placa)
+        
+        if es_mensual:
+            messagebox.showinfo(
+                "Vehículo Autorizado (MENSUALIDAD)", 
+                f"El vehículo con placa {placa} tiene una MENSUALIDAD ACTIVA.\n\n"
+                f"Vence el: {vencimiento}\n\n"
+                "¡Puede ingresar sin generar ticket!"
+            )
+            return
+
+        # Registrar entrada normal y generar ticket/recibo
+        id_generado, hora_in = operaciones.registrar_ingreso(placa, tipo)
+        operaciones.generar_qr_ticket(id_generado, placa)
+        operaciones.generar_recibo_fisico(id_generado, placa, tipo, hora_in)
+        
+        messagebox.showinfo(
+            "Ingreso Exitoso", 
+            f"Ticket #{id_generado} registrado para {tipo} ({placa}).\n\n"
+            "✅ QR generado.\n"
+            "✅ Recibo térmico enviado a impresión."
+        )
+    except Exception as e:
+        messagebox.showerror("Error del Sistema", f"Ocurrió un problema: {str(e)}")
 
 # --- PANEL DE SALIDA (LECTURA PISTOLA) ---
 frame_salida = tk.LabelFrame(ventana, text="2. Registrar Salida (Lectura Pistola QR)", font=("Arial", 11, "bold"), padx=10, pady=10)
