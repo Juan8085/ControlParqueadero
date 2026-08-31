@@ -192,10 +192,8 @@ def calcular_tarifa(tipo_vehiculo, tiempo_transcurrido):
     return monto
 
 def registrar_salida(datos_qr):
-    """Simula la lectura de la pistola QR, liquida el pago y cierra el ticket."""
+    """Simula la lectura de la pistola QR, liquida el pago detallado y cierra el ticket."""
     try:
-        # El 1 al final indica que solo debe dividir por el PRIMER guion que encuentre.
-        # Así "2-XYZ-123" se divide correctamente en "2" y "XYZ-123".
         ticket_id, placa = datos_qr.split('-', 1)
     except ValueError:
         return {"error": "Código QR inválido."}
@@ -203,7 +201,7 @@ def registrar_salida(datos_qr):
     conexion = sqlite3.connect("parqueadero.db")
     cursor = conexion.cursor()
 
-    # Buscar el registro activo en la base de datos
+    # Buscar el registro activo
     cursor.execute('''
         SELECT tipo_vehiculo, hora_ingreso FROM registros 
         WHERE id = ? AND placa = ? AND estado = 'ACTIVO'
@@ -216,14 +214,14 @@ def registrar_salida(datos_qr):
         return {"error": f"No se encontró un vehículo activo con la placa {placa}."}
 
     tipo_vehiculo = registro[0]
-    hora_ingreso = datetime.datetime.strptime(registro[1], "%Y-%m-%d %H:%M:%S")
+    hora_ingreso_str = registro[1]
+    hora_ingreso = datetime.datetime.strptime(hora_ingreso_str, "%Y-%m-%d %H:%M:%S")
     
-    # Simular que pasaron horas o usar la hora actual (para pruebas sumaremos horas)
     hora_actual = datetime.datetime.now()
     tiempo_transcurrido = hora_actual - hora_ingreso
 
-    # Calcular cuánto debe pagar
-    total_a_pagar = calcular_tarifa(tipo_vehiculo, tiempo_transcurrido)
+    # Calcular cuánto debe pagar y obtener el detalle explicativo
+    total_a_pagar, detalle_calculo = calcular_tarifa_detallada(tipo_vehiculo, tiempo_transcurrido)
 
     # Actualizar la base de datos cerrando el ticket
     cursor.execute('''
@@ -235,16 +233,89 @@ def registrar_salida(datos_qr):
     conexion.commit()
     conexion.close()
 
-    # Retornar el resumen de la operación
-    horas_totales = round(tiempo_transcurrido.total_seconds() / 3600, 2)
     return {
+        "ticket_id": ticket_id,
         "placa": placa,
         "tipo": tipo_vehiculo,
-        "tiempo": f"{horas_totales} horas",
+        "ingreso": hora_ingreso_str,
+        "salida": hora_actual.strftime("%Y-%m-%d %H:%M:%S"),
+        "detalle": detalle_calculo,
         "total": f"${total_a_pagar:,.0f}"
     }
 
-from dateutil.relativedelta import relativedelta # Necesario para sumar un mes exacto
+def calcular_tarifa_detallada(tipo_vehiculo, tiempo_transcurrido):
+    """Calcula la tarifa y retorna un texto detallado para que sea visual en pantalla."""
+    minutos_totales = tiempo_transcurrido.total_seconds() / 60
+    horas_totales_decimal = round(minutos_totales / 60, 2)
+    
+    if minutos_totales <= 15:
+        return 0, f"Tiempo total: {horas_totales_decimal} horas.\nAplica Tiempos de Gracia (<= 15 min): $0"
+        
+    horas = math.ceil(minutos_totales / 60)
+    dias = math.ceil(horas / 24)
+    monto = 0
+    explicacion = ""
+
+    if tipo_vehiculo == 'CARRO':
+        if horas <= 6:
+            monto = horas * 2500
+            explicacion = f"Cobro por Fracción/Horas: {horas} hora(s) x $2,500"
+        elif horas <= 12:
+            monto = 15000
+            explicacion = f"Tarifa fija aplicada: Rango hasta 12 Horas"
+        elif horas <= 24:
+            monto = 20000
+            explicacion = f"Tarifa fija aplicada: 1 Día completo"
+        elif dias == 2:
+            monto = 40000
+            explicacion = f"Tarifa aplicada: 2 Días"
+        elif dias == 3:
+            monto = 55000
+            explicacion = f"Tarifa aplicada: 3 Días"
+        elif 4 <= dias <= 6:
+            monto = 75000
+            explicacion = f"Tarifa aplicada Rango: 4 a 6 Días"
+        elif 7 <= dias <= 14:
+            monto = 95000
+            explicacion = f"Tarifa aplicada Rango: 7 a 14 Días"
+        elif 15 <= dias <= 22:
+            monto = 115000
+            explicacion = f"Tarifa aplicada Rango: 15 a 22 Días"
+        else:
+            monto = 125000
+            explicacion = f"Tarifa aplicada: Mes / Estadía prolongada"
+            
+    elif tipo_vehiculo == 'MOTO':
+        if horas <= 8:
+            monto = horas * 1000
+            explicacion = f"Cobro por Fracción/Horas: {horas} hora(s) x $1,000"
+        elif horas <= 12:
+            monto = 8000
+            explicacion = f"Tarifa fija aplicada: Rango hasta 12 Horas"
+        elif horas <= 24:
+            monto = 12000
+            explicacion = f"Tarifa fija aplicada: 1 Día completo"
+        elif dias == 2:
+            monto = 20000
+            explicacion = f"Tarifa aplicada: 2 Días"
+        elif dias == 3:
+            monto = 25000
+            explicacion = f"Tarifa aplicada: 3 Días"
+        elif 4 <= dias <= 6:
+            monto = 30000
+            explicacion = f"Tarifa aplicada Rango: 4 a 6 Días"
+        elif 7 <= dias <= 14:
+            monto = 40000
+            explicacion = f"Tarifa aplicada Rango: 7 a 14 Días"
+        elif 15 <= dias <= 22:
+            monto = 50000
+            explicacion = f"Tarifa aplicada Rango: 15 a 22 Días"
+        else:
+            monto = 50000
+            explicacion = f"Tarifa aplicada: Mensualidad / Estadía prolongada"
+
+    detalle_completo = f"Tiempo transcurrido: {horas_totales_decimal} horas ({int(minutos_totales)} mins).\n{explicacion}"
+    return monto, detalle_completo
 
 def registrar_mensualidad(placa, tipo_vehiculo):
     """Registra el pago de un mes para una placa y actualiza las estadísticas."""

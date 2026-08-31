@@ -46,28 +46,56 @@ def procesar_ingreso():
         messagebox.showerror("Error del Sistema", f"Ocurrió un problema: {str(e)}")
 
 def procesar_salida(event=None):
-    """Esta función se activa al dar Enter en la caja de lectura QR"""
+    """Esta función se activa al escanear el QR y despliega una ventana visual de cobro."""
     codigo_leido = entry_qr.get().strip()
     
     if not codigo_leido:
         return
 
-    # Llamamos a nuestro motor de liquidación
+    # Liquidar en el motor
     resultado = operaciones.registrar_salida(codigo_leido)
     
     if "error" in resultado:
         messagebox.showerror("Error de Lectura", resultado["error"])
-        # Limpiar resultados anteriores en pantalla
-        lbl_res_placa.config(text="Placa: ---")
-        lbl_res_tiempo.config(text="Tiempo: ---")
-        lbl_res_total.config(text="TOTAL: $0", fg="black")
-    else:
-        # Mostrar el cobro en la pantalla en letras grandes
-        lbl_res_placa.config(text=f"Placa: {resultado['placa']}")
-        lbl_res_tiempo.config(text=f"Tiempo: {resultado['tiempo']}")
-        lbl_res_total.config(text=f"TOTAL: {resultado['total']}", fg="green")
+        entry_qr.delete(0, tk.END)
+        return
     
-    entry_qr.delete(0, tk.END) # Limpiar para la siguiente lectura
+    # 🌟 CREAR VENTANA VISUAL DE COBRO (Desglose para cliente y propietario)
+    ven_cobro = tk.Toplevel(ventana)
+    ven_cobro.title("Liquidación y Cobro - Parqueadero La Catedral")
+    ven_cobro.geometry("450x450")
+    ven_cobro.config(padx=20, pady=20)
+    
+    tk.Label(ven_cobro, text="RESUMEN DE SALIDA Y COBRO", font=("Arial", 14, "bold"), fg="#1a365d").pack(pady=5)
+    tk.Label(ven_cobro, text="Parqueadero La Catedral", font=("Arial", 10, "italic")).pack(pady=2)
+    
+    # Marco con detalles del vehículo
+    frame_det = tk.LabelFrame(ven_cobro, text=" Detalles de Estadía ", font=("Arial", 10, "bold"), padx=10, pady=10)
+    frame_det.pack(fill="x", pady=10)
+    
+    tk.Label(frame_det, text=f"Ticket Nro: #{resultado['ticket_id']}", font=("Arial", 11)).pack(anchor="w", pady=2)
+    tk.Label(frame_det, text=f"Placa: {resultado['placa']} ({resultado['tipo']})", font=("Arial", 11, "bold")).pack(anchor="w", pady=2)
+    tk.Label(frame_det, text=f"Ingreso: {resultado['ingreso']}", font=("Arial", 9)).pack(anchor="w", pady=1)
+    tk.Label(frame_det, text=f"Salida:  {resultado['salida']}", font=("Arial", 9)).pack(anchor="w", pady=1)
+    
+    # Caja explicativa del cálculo matemático (La transparencia que pedía el cliente)
+    frame_calc = tk.LabelFrame(ven_cobro, text=" Desglose del Cálculo (Tarifa Aplicada) ", font=("Arial", 10, "bold"), padx=10, pady=10)
+    frame_calc.pack(fill="x", pady=5)
+    
+    lbl_explicacion = tk.Label(frame_calc, text=resultado['detalle'], font=("Arial", 10), justify="left", fg="#2d3748")
+    lbl_explicacion.pack(anchor="w")
+    
+    # Total Gigante en Verde (Muy visual)
+    lbl_total_visual = tk.Label(ven_cobro, text=f"TOTAL A PAGAR: {resultado['total']}", font=("Arial", 18, "bold"), fg="#22543d")
+    lbl_total_visual.pack(pady=15)
+    
+    def cerrar_cobro():
+        ven_cobro.destroy()
+        
+    tk.Button(ven_cobro, text="ACEPTAR Y CERRAR", bg="#2b6cb0", fg="white", font=("Arial", 10, "bold"), command=cerrar_cobro).pack(fill="x", pady=5)
+
+    # Limpiar caja de lectura QR principal
+    entry_qr.delete(0, tk.END)
 
 def abrir_ventana_mensualidad():
     """Ventana para registrar o renovar una mensualidad."""
