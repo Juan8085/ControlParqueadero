@@ -122,13 +122,13 @@ def abrir_ventana_mensualidad():
             messagebox.showerror("Error", "Debe digitar una placa.")
             return
             
-        exito, vencimiento = operaciones.registrar_mensualidad(placa, tipo)
+        exito, resultado_op = operaciones.registrar_mensualidad(placa, tipo)
         if exito:
             valor = "$125,000" if tipo == "CARRO" else "$50,000"
-            messagebox.showinfo("Éxito", f"Mensualidad registrada para {placa}.\nTotal cobrado: {valor}\nVálido hasta: {vencimiento}")
+            messagebox.showinfo("Éxito", f"Mensualidad registrada para {placa}.\nTotal cobrado: {valor}\nVálido hasta: {resultado_op}")
             ven_men.destroy()
         else:
-            messagebox.showerror("Error", "No se pudo registrar la mensualidad.")
+            messagebox.showerror("Error al Guardar", f"No se pudo registrar la mensualidad:\n{resultado_op}")
 
     tk.Button(ven_men, text="GUARDAR Y COBRAR MENSUALIDAD", bg="#2b6cb0", fg="white", font=("Arial", 10, "bold"), command=guardar_mensualidad).pack(pady=20, fill="x")
 

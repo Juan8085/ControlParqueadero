@@ -318,38 +318,49 @@ def calcular_tarifa_detallada(tipo_vehiculo, tiempo_transcurrido):
     return monto, detalle_completo
 
 def registrar_mensualidad(placa, tipo_vehiculo):
-    """Registra el pago de un mes para una placa y actualiza las estadísticas."""
-    conexion = sqlite3.connect("parqueadero.db")
-    cursor = conexion.cursor()
-    
-    # Determinar el valor de la mensualidad según tu tabla de tarifas
-    valor_mensualidad = 125000 if tipo_vehiculo == 'CARRO' else 50000
-    
-    fecha_pago = datetime.datetime.now()
-    fecha_vencimiento = fecha_pago + relativedelta(months=1)
-    
+    """Registra el pago de un mes de forma nativa y segura para el .exe."""
     try:
-        # Usamos REPLACE por si el cliente ya existía y está renovando
+        conexion = sqlite3.connect("parqueadero.db")
+        cursor = conexion.cursor()
+        
+        # Determinar el valor de la mensualidad según tarifas
+        valor_mensualidad = 125000 if tipo_vehiculo == 'CARRO' else 50000
+        
+        fecha_pago = datetime.datetime.now()
+        
+        # Calcular exactamente un mes adelante de forma nativa (sin librerías externas)
+        mes_nuevo = fecha_pago.month + 1
+        anio_nuevo = fecha_pago.year
+        if mes_nuevo > 12:
+            mes_nuevo = 1
+            anio_nuevo += 1
+        try:
+            fecha_vencimiento = fecha_pago.replace(year=anio_nuevo, month=mes_nuevo)
+        except ValueError:
+            # Manejo seguro por si el día no existe en el mes siguiente (ej. 31 de enero -> 28 de febrero)
+            if mes_nuevo == 12:
+                fecha_vencimiento = datetime.datetime(anio_nuevo + 1, 1, 1) - datetime.timedelta(days=1)
+            else:
+                fecha_vencimiento = datetime.datetime(anio_nuevo, mes_nuevo + 1, 1) - datetime.timedelta(days=1)
+        
+        # Registrar o actualizar en la tabla de mensualidades
         cursor.execute('''
         INSERT OR REPLACE INTO mensualidades (placa, tipo_vehiculo, fecha_pago, fecha_vencimiento, total_pagado)
         VALUES (?, ?, ?, ?, ?)
         ''', (placa, tipo_vehiculo, fecha_pago.strftime("%Y-%m-%d"), fecha_vencimiento.strftime("%Y-%m-%d"), valor_mensualidad))
         
-        # Opcional: Registrar este pago en la tabla de transacciones generales para que sume en el Excel y cuadre la caja del día
+        # Registrar en la tabla general de transacciones para que sume en la caja del día y el Excel
         cursor.execute('''
         INSERT INTO registros (placa, tipo_vehiculo, hora_ingreso, hora_salida, estado, total_pagado)
         VALUES (?, ?, ?, ?, 'PAGADO', ?)
         ''', (placa, f"{tipo_vehiculo} (MES)", fecha_pago.strftime("%Y-%m-%d %H:%M:%S"), fecha_pago.strftime("%Y-%m-%d %H:%M:%S"), valor_mensualidad))
         
         conexion.commit()
-        resultado = True
-    except Exception as e:
-        print(f"Error al registrar mensualidad: {e}")
-        resultado = False
-    finally:
         conexion.close()
+        return True, fecha_vencimiento.strftime("%Y-%m-%d")
         
-    return resultado, fecha_vencimiento.strftime("%Y-%m-%d")
+    except Exception as e:
+        return False, str(e)
 
 def verificar_mensualidad_activa(placa):
     """Verifica si una placa tiene un mes pagado y vigente."""
